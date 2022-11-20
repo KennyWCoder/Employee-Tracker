@@ -31,7 +31,7 @@ function init() {
             type: "list",
             name: "start",
             message: "What would you like to do?",
-            choice: [
+            choices: [
                 "View All Departments",
                 "View All Roles",
                 "View All Employees",
@@ -42,8 +42,8 @@ function init() {
                 "Quit"
             ]
         }
-        ]).then(function (start) {
-            switch (start) {
+        ]).then(function (response) {
+            switch (response.start) {
                 case "View All Departments":
                     viewDepartments();
                     break;
@@ -73,6 +73,7 @@ function init() {
                     break;
                 case "Quit":
                     console.log("Bye!");
+                    process.exit(0)
             }
         })
 };
@@ -81,25 +82,26 @@ function init() {
 function viewDepartments() {
     db.query(`SELECT * FROM department ORDER BY department.id ASC`, (err, res) => {
         if (err) throw err;
-        cTable(res);
+        console.log(err);
+        console.table(res);
         init();
     });
 };
 
 //View roles
 function viewRoles() {
-    db.query(`SELECT roles.title AS Title, roles.salary AS Salary, department.department_name AS Department FROM roles JOIN department ON roles.department_id = department.id;`, (err, res) => {
+    db.query(`SELECT roles.id AS ID, roles.title AS Title, roles.salary AS Salary, department.department_name AS Department FROM roles JOIN department ON roles.department_id = department.id;`, (err, res) => {
         if (err) throw err;
-        cTable(res);
+        console.table(res);
         init();
     });
 };
 
 //View Employees
 function viewEmployees() {
-    db.query(`SELECT CONCAT(employee.first_name, ' ', employee.last_name) AS EmployeeName, roles.title AS Title, department.department_name AS Department, CONCAT(e.first_name, ' ', e.last_name) AS Manager FROM employee INNER JOIN roles ON roles.id = rpoles.id INNER JOIN department ON department.id = roles.department_id LEFT JOIN employee e on employee.manager_id = e.id;`, (err, res) => {
+    db.query(`SELECT employee.id AS ID, CONCAT(employee.first_name, ' ', employee.last_name) AS EmployeeName, roles.title AS Title, roles.salary AS Salary, department.department_name AS Department, CONCAT(e.first_name, ' ', e.last_name) AS Manager FROM employee INNER JOIN roles ON roles.id = employee.role_id INNER JOIN department ON department.id = roles.department_id LEFT JOIN employee e on employee.manager_id = e.id;`, (err, res) => {
         if (err) throw err;
-        cTable(res);
+        console.table(res);
         init();
     });
 }
@@ -122,21 +124,32 @@ function addDepartment() {
 
 //Adding new roles
 function addRole() {
-    db.query(`SELECT roles.title AS Title, roles.salary AS Salary FROM roles`, (err, res) => {
+    db.query(`SELECT * FROM department`, (err, res) => {
+        if (err) throw err;
+        const departmentList = res.map(department => ({ name: department.department_name, value: department.id }))
         inquirer
             .prompt([
                 {
-                    name: "title",
                     type: "input",
-                    message: " What is the new role's title"
+                    name: "title",
+                    message: "What is the new role's title?"
                 },
                 {
+                    type: "number",
                     name: "salary",
-                    type: "input",
-                    message: "What is the new role's salary"
+                    message: "What is the new role's salary?"
+                },
+                {
+                    type: "list",
+                    name: "department",
+                    message: "Please select the department for this new role.",
+                    choices: departmentList
                 }
             ]).then((res) => {
-                db.query(`INSERT INTO roles SET ?;`, { title: res.title, salary: res.salary }, (err, result) => {
+                db.query(`INSERT INTO roles SET ?;`, 
+                {   title: res.title,
+                    salary: res.salary,
+                    department_id: res.department}, (err, result) => {
                     if (err) throw err;
                     console.log("New Role has been created!");
                     init();
@@ -153,7 +166,7 @@ function addEmployee() {
 
         db.query(`SELECT * FROM employee`, (err, res) => {
             if (err) throw err;
-            const employeeList = res.map(employee => ({
+            const employeesList = res.map(employee => ({
                 name: employee.first_name + employee.last_name,
                 value: employee.id
             }));
@@ -180,7 +193,7 @@ function addEmployee() {
                     type: "list",
                     name: "manager",
                     message: "Please assign a manager to the new employee.",
-                    choices: employeeList
+                    choices: employeesList
                 }
             ]).then((res) => {
                 db.query(`INSERT INTO employee SET ?;`,
@@ -200,14 +213,14 @@ function addEmployee() {
 };
 
 //Update an employee's role
-function updateRole() {
+function updateEmployeeRole() {
     db.query(`SELECT * FROM roles`, (err, res) => {
         if (err) throw err;
         const rolesList = res.map(roles => ({ name: roles.title, value: roles.id }));
 
         db.query(`SELECT * FROM employee`, (err, res) => {
             if (err) throw err;
-            const employeeList = res.map(employee => ({
+            const employeesList = res.map(employee => ({
                 name: employee.first_name + employee.last_name,
                 value: employee.id
             }));
@@ -218,7 +231,7 @@ function updateRole() {
                     type: "list",
                     name: "employees",
                     message: "Please select the employee who you would like to update.",
-                    choices: employeeList
+                    choices: employeesList
                 },
                 {
                     type: "list",
@@ -229,8 +242,8 @@ function updateRole() {
             ]).then((res) => {
                 db.query(`UPDATE employee SET role_id = ? WHERE id = ?;`,
                     [
+                        res.roles,
                         res.employees,
-                        res.roles
                     ], (err, result) => {
                         if (err) throw err;
                         console.log("Your selected employee's role has been updated!");
@@ -241,4 +254,3 @@ function updateRole() {
 })
 };
 
-init();
