@@ -1,6 +1,6 @@
 const inquirer = require('inquirer');
 const mysql = require('mysql2');
-const cTable =require("console.table");
+const cTable = require("console.table");
 
 const db = mysql.createConnection(
     {
@@ -24,6 +24,7 @@ db.connect((err) => {
     init();
 });
 
+//main menu
 function init() {
     inquirer
         .prompt([{
@@ -56,7 +57,7 @@ function init() {
                     break;
 
                 case "Add Department":
-                    addDepartments();
+                    addDepartment();
                     break;
 
                 case "Add Role":
@@ -75,3 +76,169 @@ function init() {
             }
         })
 };
+
+//view all department with ascending order
+function viewDepartments() {
+    db.query(`SELECT * FROM department ORDER BY department.id ASC`, (err, res) => {
+        if (err) throw err;
+        cTable(res);
+        init();
+    });
+};
+
+//View roles
+function viewRoles() {
+    db.query(`SELECT roles.title AS Title, roles.salary AS Salary, department.department_name AS Department FROM roles JOIN department ON roles.department_id = department.id;`, (err, res) => {
+        if (err) throw err;
+        cTable(res);
+        init();
+    });
+};
+
+//View Employees
+function viewEmployees() {
+    db.query(`SELECT CONCAT(employee.first_name, ' ', employee.last_name) AS EmployeeName, roles.title AS Title, department.department_name AS Department, CONCAT(e.first_name, ' ', e.last_name) AS Manager FROM employee INNER JOIN roles ON roles.id = rpoles.id INNER JOIN department ON department.id = roles.department_id LEFT JOIN employee e on employee.manager_id = e.id;`, (err, res) => {
+        if (err) throw err;
+        cTable(res);
+        init();
+    });
+}
+
+//Add Department
+function addDepartment() {
+    inquirer
+        .prompt([{
+            type: "input",
+            name: "addDepartment",
+            message: "What department would you like to add?"
+        }]).then((res) => {
+            db.query(`INSERT INTO department SET ?;`, { department_name: res.addDepartment }, (err, res) => {
+                if (err) throw err;
+                console.log("New Department has been created!");
+                init();
+            });
+        })
+};
+
+//Adding new roles
+function addRole() {
+    db.query(`SELECT roles.title AS Title, roles.salary AS Salary FROM roles`, (err, res) => {
+        inquirer
+            .prompt([
+                {
+                    name: "title",
+                    type: "input",
+                    message: " What is the new role's title"
+                },
+                {
+                    name: "salary",
+                    type: "input",
+                    message: "What is the new role's salary"
+                }
+            ]).then((res) => {
+                db.query(`INSERT INTO roles SET ?;`, { title: res.title, salary: res.salary }, (err, result) => {
+                    if (err) throw err;
+                    console.log("New Role has been created!");
+                    init();
+                });
+            })
+    })
+};
+
+//Adding employee
+function addEmployee() {
+    db.query(`SELECT * FROM roles`, (err, res) => {
+        if (err) throw err;
+        const rolesList = res.map(roles => ({ name: roles.title, value: roles.id }));
+
+        db.query(`SELECT * FROM employee`, (err, res) => {
+            if (err) throw err;
+            const employeeList = res.map(employee => ({
+                name: employee.first_name + employee.last_name,
+                value: employee.id
+            }));
+        
+        inquirer
+            .prompt([
+                {
+                    type: "input",
+                    name: "firstName",
+                    message: "Please enter the new employee's first name."
+                },
+                {
+                    type: "input",
+                    name: "lastName",
+                    message: "Please enter the new employee's last name."
+                },
+                {
+                    type: "list",
+                    name: "role",
+                    message: "Please select the role for the new employee.",
+                    choices: rolesList
+                },
+                {
+                    type: "list",
+                    name: "manager",
+                    message: "Please assign a manager to the new employee.",
+                    choices: employeeList
+                }
+            ]).then((res) => {
+                db.query(`INSERT INTO employee SET ?;`,
+                    {
+                        first_name: res.firstName,
+                        last_name: res.lastName,
+                        role_id: res.role,
+                        manager_id: res.manager
+                    }, (err, result) => {
+                        if (err) throw err;
+                        console.log("New Employee has been created!");
+                        init();
+                    });
+            })
+    })
+})
+};
+
+//Update an employee's role
+function updateRole() {
+    db.query(`SELECT * FROM roles`, (err, res) => {
+        if (err) throw err;
+        const rolesList = res.map(roles => ({ name: roles.title, value: roles.id }));
+
+        db.query(`SELECT * FROM employee`, (err, res) => {
+            if (err) throw err;
+            const employeeList = res.map(employee => ({
+                name: employee.first_name + employee.last_name,
+                value: employee.id
+            }));
+        
+        inquirer
+            .prompt([
+                {
+                    type: "list",
+                    name: "employees",
+                    message: "Please select the employee who you would like to update.",
+                    choices: employeeList
+                },
+                {
+                    type: "list",
+                    name: "roles",
+                    message: "Please select the new role for the employee.",
+                    choices: rolesList
+                },
+            ]).then((res) => {
+                db.query(`UPDATE employee SET role_id = ? WHERE id = ?;`,
+                    [
+                        res.employees,
+                        res.roles
+                    ], (err, result) => {
+                        if (err) throw err;
+                        console.log("Your selected employee's role has been updated!");
+                        init();
+                    });
+            })
+    })
+})
+};
+
+init();
