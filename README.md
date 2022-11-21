@@ -16,6 +16,7 @@
   
   ## Usage
   Use to track the company's structuce
+  
   <img width="445" alt="image" src="https://user-images.githubusercontent.com/97656734/202933900-6d19d772-5d73-4d28-87dc-9b192e115e27.png">
 
   ## License
